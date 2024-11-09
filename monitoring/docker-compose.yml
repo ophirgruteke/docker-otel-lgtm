@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - influxdb
+      - loki
+      - prometheus
+      - tempo
+      - opentelemetry-collector
+    networks:
+      - monitoring
+
+  influxdb:
+    image: influxdb:2.0
+    ports:
+      - "8086:8086"
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=admin
+      - DOCKER_INFLUXDB_INIT_PASSWORD=adminpass
+      - DOCKER_INFLUXDB_INIT_ORG=ssi
+      - DOCKER_INFLUXDB_INIT_BUCKET=data
+      - DOCKER_INFLUXDB_INIT_RETENTION=0
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=9_pK0KTIMySKWPU-CVGxxD5M68kYRG3CJbSYDlm6aHz_cCJXX0M0l2SU8Sg3CU1qrvSPdkAxAvN631OS59QUCQ==
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    networks:
+      - monitoring
+
+  loki:
+    image: grafana/loki:2.8.2
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./loki/config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring
+
+  tempo:
+    image: grafana/tempo:latest
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml
+      - tempo_data:/var/tempo
+    command: -config.file=/etc/tempo/tempo.yaml
+    networks:
+      - monitoring
+
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector-contrib
+    command: [ "--config", "/etc/otel-collector-config.yaml" ]
+    ports:
+      - "4317:4317" # gRPC
+      - "4318:4318" # HTTP
+      - "8888:8888" # Prometheus metrics exporter
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - otel_data:/var/lib/otelcol
+    depends_on:
+      - influxdb
+      - loki
+      - tempo
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  grafana_data:
+  influxdb_data:
+  loki_data:
+  prometheus_data:
+  tempo_data:
+  otel_data:

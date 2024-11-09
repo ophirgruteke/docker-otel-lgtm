@@ -1,0 +1,59 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
+  hostmetrics:
+    collection_interval: 10s
+    scrapers:
+      cpu:
+      load:
+      memory:
+      disk:
+      filesystem:
+      network:
+      processes:
+
+processors:
+  batch:
+
+exporters:
+  debug:
+    verbosity: normal  # Options are normal, detailed, full
+
+  prometheus:
+    endpoint: "0.0.0.0:8889"  # Changed from 8888 to 8889
+
+
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+
+  influxdb:
+    endpoint: "http://influxdb:8086"
+    org: "ssi"
+    bucket: "data"
+    token: "9_pK0KTIMySKWPU-CVGxxD5M68kYRG3CJbSYDlm6aHz_cCJXX0M0l2SU8Sg3CU1qrvSPdkAxAvN631OS59QUCQ=="
+
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo, debug]
+
+    metrics:
+      receivers: [otlp, hostmetrics]
+      processors: [batch]
+      exporters: [prometheus, influxdb, debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [loki, debug]
