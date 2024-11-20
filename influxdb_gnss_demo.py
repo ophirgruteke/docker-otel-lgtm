@@ -7,15 +7,16 @@ from opentelemetry.metrics import (
     set_meter_provider,
 )
 from typing import Iterable
+from loguru import logger
+import time
 
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 import pandas as pd
 from pynmea2 import parse
 
-# Initialize OpenTelemetry Metric Exporter
 exporter = OTLPMetricExporter(endpoint="http://localhost:4317")
-metric_reader = PeriodicExportingMetricReader(exporter)
+metric_reader = PeriodicExportingMetricReader(exporter, export_interval_millis=1000)
 provider = MeterProvider(metric_readers=[metric_reader])
 metrics.set_meter_provider(provider)
 meter = metrics.get_meter(__name__)
@@ -56,7 +57,7 @@ signal_strength_metric = meter.create_observable_gauge(
 # Load CSV data
 df = pd.read_csv("gnss.csv")
 
-# Example function to parse NMEA sentences and extract key metrics
+# Function to parse NMEA sentences and extract key metrics
 def extract_metrics_from_nmea(nmea_sentence):
     global latest_latitude, latest_longitude, latest_signal_strength
     try:
@@ -65,16 +66,24 @@ def extract_metrics_from_nmea(nmea_sentence):
         if msg.sentence_type == 'GGA':  # GPS Fix Data
             latest_latitude = msg.latitude
             latest_longitude = msg.longitude
+            print(f"Updated latitude: {latest_latitude}, longitude: {latest_longitude}")
         elif msg.sentence_type == 'GSV':  # Satellites in View
             latest_signal_strength = msg.snr
+            print(f"Updated signal strength: {latest_signal_strength}")
     except Exception as e:
         print(f"Error parsing NMEA sentence: {e}")
 
 # Iterate through rows and extract metrics for each NMEA sentence
 for index, row in df.iterrows():
-    extract_metrics_from_nmea(row['nmea_sentence'])
+    nmea_sentence = row['nmea_sentence']
+    logger.info(f"Processing NMEA sentence: {nmea_sentence}")
+    extract_metrics_from_nmea(nmea_sentence)
+    time.sleep(1)  # Add a delay to simulate periodic updates
 
-
+# # Keep the script running to allow the exporter to send data
+# logger.info("Exporter is running...")
+# while True:
+#     time.sleep(60)
 
 
 # from opentelemetry.sdk.metrics import MeterProvider

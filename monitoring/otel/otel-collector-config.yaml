@@ -39,7 +39,7 @@ service:
       exporters: [otlp/tempo, debug]
 
     metrics:
-      receivers: [otlp, hostmetrics]
+      receivers: [otlp]
       processors: [batch]
       exporters: [prometheus, influxdb, debug]
 
